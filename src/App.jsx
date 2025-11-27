@@ -2,16 +2,16 @@ import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 
-import HomePage from './pages/HomePage'
-import FlightsPage from './pages/FlightsPage'
-import LodgingPage from './pages/LodgingPage'
-import VehiclesPage from './pages/VehiclesPage'
-import ExperiencesPage from './pages/ExperiencesPage'
-import ReservationsPage from './pages/ReservationsPage'
-import CheckoutPage from './pages/CheckoutPage'
+import HomePage from './pages/main/HomePage'
+import FlightsPage from './pages/vehicles/FlightsPage'
+import LodgingPage from './pages/lodging/LodgingPage'
+import VehiclesPage from './pages/vehicles/VehiclesPage'
+import ExperiencesPage from './pages/user/ExperiencesPage'
+import ReservationsPage from './pages/user/ReservationsPage'
+import CheckoutPage from './pages/payment/CheckoutPage'
 
 function App() {
-  return (
+return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-50">
       <Navbar />
 

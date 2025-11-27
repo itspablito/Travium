@@ -1,4 +1,5 @@
-import SearchBar from '../components/common/SearchBar'
+import SearchBar from '../../components/common/SearchBar';
+import FilterPills from '../../components/common/FilterPills';
 
 export default function VehiclesPage() {
   return (

@@ -1,5 +1,6 @@
-import SearchBar from '../components/common/SearchBar'
-import FilterPills from '../components/common/FilterPills'
+import SearchBar from '../../components/common/SearchBar';
+import FilterPills from '../../components/common/FilterPills';
+
 import { Link } from 'react-router-dom'
 
 export default function HomePage() {
