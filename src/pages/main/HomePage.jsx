@@ -17,9 +17,9 @@ export default function HomePage() {
     <LazyMotion features={domAnimation}>
       <div className="min-h-screen bg-gradient-to-b from-[#f6fbff] via-[#eef7fb] to-[#f7f9fc] text-slate-900 overflow-hidden">
 
-        {/* Decorative blobs optimizados */}
+        {/* Decorative blobs*/}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-          {/* Blob 1 - animación super ligera */}
+          {/* Blob 1*/}
           <motion.div
             initial={{ opacity: 0.35 }}
             animate={{ opacity: 0.42 }}
@@ -27,7 +27,7 @@ export default function HomePage() {
             className="absolute top-[-8%] left-[-10%] w-[30rem] h-[30rem] bg-gradient-to-br from-white/50 to-[#dbeffd]/40 rounded-3xl blur-3xl"
           />
 
-          {/* Blob 2 - animación suave */}
+          {/* Blob 2*/}
           <motion.div
             initial={{ opacity: 0.22 }}
             animate={{ opacity: 0.30 }}
