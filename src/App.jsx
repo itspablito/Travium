@@ -3,6 +3,7 @@ import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 
 import HomePage from './pages/main/HomePage'
+import Loging from './pages/main/Login'
 import FlightsPage from './pages/vehicles/FlightsPage'
 import LodgingPage from './pages/lodging/LodgingPage'
 import VehiclesPage from './pages/vehicles/VehiclesPage'
@@ -20,6 +21,7 @@ return (
           <Route path="/" element={<HomePage />} />
           <Route path="/flights" element={<FlightsPage />} />
           <Route path="/lodging" element={<LodgingPage />} />
+          <Route path="/login" element={<Loging />} />
           <Route path="/vehicles" element={<VehiclesPage />} />
           <Route path="/experiences" element={<ExperiencesPage />} />
           <Route path="/reservations" element={<ReservationsPage />} />
