@@ -27,9 +27,13 @@ export default function Navbar() {
         </NavLink>
       </div>
 
-      <button className="px-3 py-1.5 text-xs sm:text-sm rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold">
+      {/* ⭐ BOTÓN QUE AHORA REDIRIGE AL LOGIN */}
+      <Link
+        to="/login"
+        className="px-3 py-1.5 text-xs sm:text-sm rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold"
+      >
         Iniciar sesión
-      </button>
+      </Link>
     </nav>
   )
 }
