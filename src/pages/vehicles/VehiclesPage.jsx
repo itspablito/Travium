@@ -1,19 +1,308 @@
-import SearchBar from '../../components/common/SearchBar';
-import FilterPills from '../../components/common/FilterPills';
+import React, { useState } from "react";
+import { Car, Bike, Zap, Users, Clock, Star } from "lucide-react";
+
+/* ======================================================
+   ICON RENDER (no rompe Vite)
+====================================================== */
+
+function VehicleIcon({ type }) {
+  const props = { className: "w-6 h-6 text-slate-700" };
+
+  switch (type) {
+    case "car":
+      return <Car {...props} />;
+    case "bike":
+      return <Bike {...props} />;
+    case "scooter":
+      return <Zap {...props} />; // motopatín eléctrico
+    default:
+      return null;
+  }
+}
+
+/* ======================================================
+   MOCK DATA
+====================================================== */
+
+const VEHICLES = [
+  {
+    id: 1,
+    type: "Carro",
+    icon: "car",
+    priceHour: 12,
+    priceDay: 75,
+    capacity: 5,
+    fuel: "Gasolina",
+    transmission: "Automático",
+    rating: 4.7,
+    recommended: "Ideal para turismo y ciudad",
+  },
+  {
+    id: 2,
+    type: "Moto",
+    icon: "bike",
+    priceHour: 7,
+    priceDay: 40,
+    capacity: 2,
+    fuel: "Gasolina",
+    transmission: "Manual",
+    rating: 4.5,
+    recommended: "Perfecta para trayectos cortos",
+  },
+  {
+    id: 3,
+    type: "Motopatín",
+    icon: "scooter",
+    priceHour: 4,
+    priceDay: 20,
+    capacity: 1,
+    fuel: "Eléctrico",
+    transmission: "Automático",
+    rating: 4.3,
+    recommended: "Más barato para recorridos urbanos",
+  },
+];
+
+/* ======================================================
+   COMPONENTS
+====================================================== */
+
+function Extra({ label, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-full text-sm font-semibold border transition ${
+        active
+          ? "bg-sky-600 text-white border-sky-600"
+          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+      }`}
+      type="button"
+    >
+      {label}
+    </button>
+  );
+}
+
+/* ======================================================
+   PAGE
+====================================================== */
 
 export default function VehiclesPage() {
+  const [mode, setMode] = useState("hours"); // hours | days
+  const [duration, setDuration] = useState(2);
+  const [passengers, setPassengers] = useState(1);
+
+  const [extras, setExtras] = useState({
+    insurance: false,
+    gps: false,
+    helmet: false,
+  });
+
+  function toggleExtra(key) {
+    setExtras((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function calculateTotal(vehicle) {
+    const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 1;
+
+    const base =
+      mode === "hours"
+        ? vehicle.priceHour * safeDuration
+        : vehicle.priceDay * safeDuration;
+
+    const extrasCost =
+      (extras.insurance ? 10 : 0) +
+      (extras.gps ? 5 : 0) +
+      (extras.helmet ? 3 : 0);
+
+    const tax = base * 0.12;
+
+    return base + extrasCost + tax;
+  }
+
+  const filteredVehicles = VEHICLES.filter((v) => v.capacity >= passengers);
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-4">Alquiler de vehículos</h1>
-      <p className="text-sm text-slate-500 mb-4">
-        Reserva autos, motos o transporte local según tu destino y fechas de viaje.
+    <div className="max-w-7xl mx-auto px-4 py-10">
+      {/* Header */}
+      <h1 className="text-3xl font-extrabold text-slate-900">
+        Alquiler de vehículos
+      </h1>
+      <p className="text-slate-600 mt-1">
+        Elige, compara y reserva vehículos por horas o por días.
       </p>
 
-      <SearchBar placeholder="Ciudad de recogida, fechas, tipo de vehículo..." />
+      {/* Rental selector */}
+      <div className="mt-6 flex flex-wrap gap-4 items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        {/* Mode toggle */}
+        <div className="flex rounded-full border border-slate-200 p-1 bg-white">
+          {["hours", "days"].map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                mode === m
+                  ? "bg-sky-600 text-white"
+                  : "text-slate-700 hover:bg-slate-50"
+              }`}
+              type="button"
+            >
+              {m === "hours" ? "Por horas" : "Por días"}
+            </button>
+          ))}
+        </div>
 
-      <div className="mt-8 text-slate-400 text-sm">
-        (Aquí irán las opciones de vehículos, proveedores, precios y condiciones...)
+        {/* Duration */}
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-slate-600" />
+          <input
+            type="number"
+            min={1}
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="w-20 border border-slate-200 rounded-lg px-3 py-1 text-sm text-slate-900"
+          />
+          <span className="text-sm text-slate-600">
+            {mode === "hours" ? "horas" : "días"}
+          </span>
+        </div>
+
+        {/* Passengers */}
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-slate-600" />
+          <input
+            type="number"
+            min={1}
+            value={passengers}
+            onChange={(e) => setPassengers(Number(e.target.value))}
+            className="w-20 border border-slate-200 rounded-lg px-3 py-1 text-sm text-slate-900"
+          />
+          <span className="text-sm text-slate-600">personas</span>
+        </div>
+      </div>
+
+      {/* Extras */}
+      <div className="mt-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 className="font-bold text-slate-900 mb-2">Extras</h3>
+        <div className="flex flex-wrap gap-3">
+          <Extra
+            label="Seguro adicional (+$10)"
+            active={extras.insurance}
+            onClick={() => toggleExtra("insurance")}
+          />
+          <Extra
+            label="GPS (+$5)"
+            active={extras.gps}
+            onClick={() => toggleExtra("gps")}
+          />
+          <Extra
+            label="Casco (+$3)"
+            active={extras.helmet}
+            onClick={() => toggleExtra("helmet")}
+          />
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          El precio final se calcula automáticamente con impuestos (12%) y extras seleccionados.
+        </p>
+      </div>
+
+      {/* Vehicles */}
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        {filteredVehicles.map((v) => {
+          const total = calculateTotal(v);
+          const unitPrice = mode === "hours" ? v.priceHour : v.priceDay;
+
+          return (
+            <div
+              key={v.id}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-slate-100 rounded-xl">
+                  <VehicleIcon type={v.icon} />
+                </div>
+
+                <div>
+                  <div className="font-bold text-slate-900">{v.type}</div>
+                  <div className="text-sm text-slate-600">
+                    {v.transmission} · {v.fuel}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 text-sm text-slate-600">{v.recommended}</div>
+
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                <Users className="w-4 h-4" /> {v.capacity} personas
+                <Star className="w-4 h-4 text-amber-400 ml-3" /> {v.rating}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">
+                  {mode === "hours" ? "Precio por hora" : "Precio por día"}
+                </div>
+                <div className="text-lg font-extrabold text-slate-900">
+                  ${unitPrice}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Duración: {duration} {mode === "hours" ? "h" : "d"}
+                </div>
+              </div>
+
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <div className="text-xs text-slate-500">Precio estimado total</div>
+                <div className="text-2xl font-extrabold text-slate-900">
+                  ${Math.round(total)}
+                </div>
+                <div className="text-xs text-slate-500">
+                  Incluye impuestos y extras (mock)
+                </div>
+              </div>
+
+              <button
+                className="mt-4 w-full px-4 py-2 rounded-xl bg-sky-600 text-white font-semibold hover:bg-sky-500 transition shadow"
+                type="button"
+                onClick={() => {
+                  alert(
+                    `Reservando: ${v.type}\nModo: ${
+                      mode === "hours" ? "Por horas" : "Por días"
+                    }\nDuración: ${duration}\nPersonas: ${passengers}\nTotal: $${Math.round(
+                      total
+                    )}`
+                  );
+                }}
+              >
+                Reservar
+              </button>
+
+              <button
+                className="mt-2 w-full px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-900 text-sm font-semibold transition"
+                type="button"
+                onClick={() => {
+                  alert(
+                    `Detalle rápido:\n- ${mode === "hours" ? "Hora" : "Día"}: $${unitPrice}\n- Impuestos: 12%\n- Extras: ${
+                      (extras.insurance ? "Seguro, " : "") +
+                      (extras.gps ? "GPS, " : "") +
+                      (extras.helmet ? "Casco, " : "") || "Ninguno"
+                    }`
+                  );
+                }}
+              >
+                Ver desglose
+              </button>
+            </div>
+          );
+        })}
+
+        {!filteredVehicles.length && (
+          <div className="md:col-span-3 p-6 rounded-2xl border border-slate-200 bg-white text-slate-700">
+            <div className="font-semibold">No hay vehículos para esa cantidad de pasajeros.</div>
+            <div className="text-sm text-slate-600 mt-1">
+              Baja el número de personas o agrega más categorías.
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
