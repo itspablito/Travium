@@ -12,8 +12,8 @@ import ReservationsPage from './pages/user/ReservationsPage'
 import CheckoutPage from './pages/payment/CheckoutPage'
 
 function App() {
-return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-50">
+  return (
+    <div className="min-h-screen flex flex-col bg-white text-slate-900">
       <Navbar />
 
       <main className="flex-1">

@@ -36,33 +36,7 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Top navigation */}
-        <header className="sticky top-0 z-30 bg-white/60 backdrop-blur-md border-b border-slate-200/60">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-gradient-to-br from-[#ffd7e6] to-[#dbeffd] p-2 shadow-sm">
-                <span className="font-black text-xl tracking-tight">Travium</span>
-              </div>
-              <span className="text-sm text-slate-600">Todo en uno · Vuelos · Alojamientos · Movilidad</span>
-            </div>
-
-            <nav aria-label="Main navigation" className="hidden md:flex items-center gap-6 text-sm">
-              <Link to="/" className="hover:text-sky-700 transition">Inicio</Link>
-              <Link to="/flights" className="hover:text-sky-700 transition">Vuelos</Link>
-              <Link to="/lodging" className="hover:text-sky-700 transition">Alojamientos</Link>
-              <Link to="/experiences" className="hover:text-sky-700 transition">Experiencias</Link>
-            </nav>
-
-            <div className="flex items-center gap-3">
-              <button className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm bg-white shadow-sm border border-slate-200">
-                <Calendar className="w-4 h-4 text-slate-600" />
-                <span className="text-slate-700">Mis viajes</span>
-              </button>
-
-              <button className="px-3 py-1.5 rounded-full text-sm bg-sky-600 text-white hover:bg-sky-500 transition">Iniciar sesión</button>
-            </div>
-          </div>
-        </header>
+        {/* ✅ NAVBAR ELIMINADO: ahora vive en components/layout/Navbar.jsx */}
 
         <main className="max-w-7xl mx-auto px-6 py-12">
           {/* Hero */}
@@ -144,9 +118,9 @@ export default function HomePage() {
               imgSrc="/images/placeholder-flight-large.jpg"
               reverse={false}
               bullets={[
-                'Comparación en tiempo real entre aerolíneas y agencias',
-                'Alertas de precio y calendario flexible',
-                'Integración con itinerarios automáticos'
+                "Comparación en tiempo real entre aerolíneas y agencias",
+                "Alertas de precio y calendario flexible",
+                "Integración con itinerarios automáticos"
               ]}
             />
 
@@ -157,9 +131,9 @@ export default function HomePage() {
               imgSrc="/images/placeholder-hotel-large.jpg"
               reverse={true}
               bullets={[
-                'Fotos y placeholders para galerías',
-                'Filtros por sostenibilidad y puntuación',
-                'Reservas instantáneas'
+                "Fotos y placeholders para galerías",
+                "Filtros por sostenibilidad y puntuación",
+                "Reservas instantáneas"
               ]}
             />
 
@@ -170,9 +144,9 @@ export default function HomePage() {
               imgSrc="/images/placeholder-car-large.jpg"
               reverse={false}
               bullets={[
-                'Comparador de proveedores',
-                'Entrega y recogida flexible',
-                'Opciones eléctricas'
+                "Comparador de proveedores",
+                "Entrega y recogida flexible",
+                "Opciones eléctricas"
               ]}
             />
 
@@ -183,9 +157,9 @@ export default function HomePage() {
               imgSrc="/images/placeholder-food-large.jpg"
               reverse={true}
               bullets={[
-                'Categorías: aventura, gourmet, cultura',
-                'Cancelaciones flexibles',
-                'Guías verificados'
+                "Categorías: aventura, gourmet, cultura",
+                "Cancelaciones flexibles",
+                "Guías verificados"
               ]}
             />
           </section>
