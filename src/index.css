@@ -3,3 +3,9 @@
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+.lodging-price-marker {
+  background: transparent;
+  border: none;
+}
+
