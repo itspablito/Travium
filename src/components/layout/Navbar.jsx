@@ -20,12 +20,14 @@ export default function Navbar() {
           <Link to="/" className="hover:text-sky-700 transition">Inicio</Link>
           <Link to="/flights" className="hover:text-sky-700 transition">Vuelos</Link>
           <Link to="/lodging" className="hover:text-sky-700 transition">Alojamientos</Link>
+          <Link to="/vehicles" className="hover:text-sky-700 transition">Vehículos</Link>
+          <Link to="/services" className="hover:text-sky-700 transition">Servicios</Link>
           <Link to="/experiences" className="hover:text-sky-700 transition">Experiencias</Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <Link
-            to="/bookings"
+            to="/reservations"
             className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm bg-white shadow-sm border border-slate-200 hover:bg-slate-50 transition"
           >
             <Calendar className="w-4 h-4 text-slate-600" />
