@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { FaUser, FaEnvelope, FaPlane, FaStar, FaCog, FaHeart, FaBell, FaKey } from 'react-icons/fa';
-
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 
@@ -11,14 +10,34 @@ const DashboardProfile = () => {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [stats, setStats] = useState({ trips: 0, points: 0, upcoming: 0 });
   const [preferences, setPreferences] = useState({ seat: 'Ventana', airline: 'Cualquier' });
+  const [trips, setTrips] = useState({ upcoming: [], completed: [] });
 
+  // Cargar datos de usuario y reservas
   useEffect(() => {
-    if (user) {
-      setFormData({ username: user.username, email: user.email });
-      // Simulación de datos
-      setStats({ trips: 24, points: 5420, upcoming: 3 });
-      setPreferences({ seat: 'Ventana', airline: 'Aerolínea Favorita: SkyAir' });
-    }
+    if (!user) return;
+    setFormData({ username: user.username, email: user.email });
+
+    // Preferencias simuladas
+    setPreferences({ seat: 'Ventana', airline: 'SkyAir' });
+
+    // Llamar API de reservas
+    const fetchTrips = async () => {
+      try {
+        const res = await axios.get(`http://localhost:3008/api/reservations/${user.id}`);
+        setTrips(res.data);
+
+        // Actualizar estadísticas
+        setStats({
+          trips: res.data.completed.length,
+          upcoming: res.data.upcoming.length,
+          points: res.data.completed.length * 100 // Ejemplo: 100 puntos por viaje completado
+        });
+      } catch (err) {
+        console.error('Error fetching trips:', err);
+      }
+    };
+
+    fetchTrips();
   }, [user]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,6 +46,7 @@ const DashboardProfile = () => {
     e.preventDefault();
     setLoading(true);
     setMessage({ text: '', type: '' });
+
     try {
       const token = localStorage.getItem('token');
       const res = await axios.put('http://localhost:3004/api/auth/profile', formData, {
@@ -151,13 +171,27 @@ const DashboardProfile = () => {
       <aside className="w-72 bg-white border-l border-gray-200 shadow-sm p-6 hidden xl:flex flex-col gap-6">
         <h3 className="text-xl font-semibold text-gray-800 mb-4">Próximos Viajes</h3>
         <div className="flex flex-col gap-3">
-          <div className="p-3 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition">
-            <p className="text-gray-700 font-medium">Vuelo a París</p>
-            <p className="text-gray-500 text-sm">15 Dic 2025 - 22 Dic 2025</p>
-          </div>
-          <div className="p-3 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition">
-            <p className="text-gray-700 font-medium">Vuelo a Tokio</p>
-            <p className="text-gray-500 text-sm">02 Ene 2026 - 10 Ene 2026</p>
+          {trips.upcoming.length ? trips.upcoming.map(trip => (
+            <div key={trip.id} className="p-3 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition">
+              <p className="text-gray-700 font-medium">{trip.modo} a {trip.vehiculo_id ? `Vehículo ${trip.vehiculo_id}` : 'Destino'}</p>
+              <p className="text-gray-500 text-sm">{new Date(trip.fecha_inicio).toLocaleDateString()} - {new Date(trip.fecha_inicio).toLocaleDateString()}</p>
+              <p className="text-gray-400 text-sm">Pasajeros: {trip.pasajeros}</p>
+              <p className="text-gray-400 text-sm">Total: ${trip.total}</p>
+            </div>
+          )) : <p className="text-gray-500">No hay viajes próximos</p>}
+        </div>
+
+        <div className="mt-6">
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">Viajes Realizados</h3>
+          <div className="flex flex-col gap-3">
+            {trips.completed.length ? trips.completed.map(trip => (
+              <div key={trip.id} className="p-3 bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition">
+                <p className="text-gray-700 font-medium">{trip.modo} a {trip.vehiculo_id ? `Vehículo ${trip.vehiculo_id}` : 'Destino'}</p>
+                <p className="text-gray-500 text-sm">{new Date(trip.fecha_inicio).toLocaleDateString()} - {new Date(trip.fecha_inicio).toLocaleDateString()}</p>
+                <p className="text-gray-400 text-sm">Pasajeros: {trip.pasajeros}</p>
+                <p className="text-gray-400 text-sm">Total: ${trip.total}</p>
+              </div>
+            )) : <p className="text-gray-500">No hay viajes realizados</p>}
           </div>
         </div>
 
@@ -166,7 +200,6 @@ const DashboardProfile = () => {
           <p className="text-gray-500 text-sm flex items-center gap-2"><FaBell /> No hay alertas nuevas</p>
         </div>
       </aside>
-
     </div>
   );
 };
