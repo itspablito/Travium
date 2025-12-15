@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Map, X, Users, CalendarDays, Search } from "lucide-react";
+import { Map, X, Search } from "lucide-react";
 import LodgingMap from "../../components/lodging/lodgingMap";
 import { fetchHotelsByCity } from "../../services/overpassApi";
 import { searchCities } from "../../services/nominatimApi";
+import { useAuth } from "../../contexts/AuthContext";
 
 function daysBetweenISO(checkIn, checkOut) {
   if (!checkIn || !checkOut) return 1;
@@ -14,6 +15,8 @@ function daysBetweenISO(checkIn, checkOut) {
 }
 
 export default function LodgingPage() {
+  const { user } = useAuth();
+
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -37,10 +40,9 @@ export default function LodgingPage() {
 
   const hasDestination = Boolean(selectedPlace);
 
-  /* =========================
-     🔹 AUTOCOMPLETE CIUDADES
-     (Nominatim)
-  ========================= */
+  // =========================
+  // AUTOCOMPLETE CIUDADES (Nominatim)
+  // =========================
   useEffect(() => {
     if (query.trim().length < 2) {
       setSuggestions([]);
@@ -65,10 +67,9 @@ export default function LodgingPage() {
     };
   }, [query]);
 
-  /* =========================
-     🔹 BUSCAR HOTELES
-     (Overpass)
-  ========================= */
+  // =========================
+  // CARGAR HOTELES (Overpass)
+  // =========================
   useEffect(() => {
     if (!selectedPlace) {
       setResults([]);
@@ -96,11 +97,12 @@ export default function LodgingPage() {
     };
   }, [selectedPlace]);
 
+  // =========================
+  // MAP MODE
+  // =========================
   const toggleMapMode = () => {
     if (!hasDestination) {
-      setAlertMsg(
-        "Primero selecciona una ciudad para ver hoteles en el mapa."
-      );
+      setAlertMsg("Primero selecciona una ciudad para ver hoteles en el mapa.");
       setMapMode(false);
       return;
     }
@@ -108,45 +110,81 @@ export default function LodgingPage() {
     setMapMode((v) => !v);
   };
 
-  const onSelectHotel = (hotel) => {
-    console.log("Seleccionado:", hotel);
+  // =========================
+  // RESERVAR HOTEL
+  // =========================
+  const onReserveHotel = async (hotel) => {
+    if (!user) {
+      alert("Debes iniciar sesión para reservar.");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:3001/api/reservations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          hotelName: hotel.name,
+          osmType: hotel.osm_type || hotel.osmType,
+          osmId: hotel.osm_id || hotel.osmId,
+          city: hotel.city,
+          country: hotel.country || "desconocido",
+          checkIn, 
+          checkOut,
+          guests,
+          basePrice: hotel.basePrice || 50,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`Reserva creada! Total: COP ${data.reservation.total_price}`);
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error creando reserva");
+    }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      {/* ========================= */}
+      {/* HEADER */}
+      {/* ========================= */}
+      <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            Alojamiento
-          </h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Encuentra hoteles según tu destino, fechas y personas.
+          <h1 className="text-3xl font-extrabold text-slate-900">Alojamientos</h1>
+          <p className="text-slate-600 mt-1">
+            Encuentra hoteles según tu destino, fechas y número de personas.
           </p>
         </div>
-
         <button
           onClick={toggleMapMode}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-900 shadow-sm transition"
         >
           {mapMode ? <X className="w-4 h-4" /> : <Map className="w-4 h-4" />}
-          {mapMode ? "Cerrar mapa" : "Buscar por mapa"}
+          {mapMode ? "Cerrar mapa" : "Ver en mapa"}
         </button>
       </div>
 
       {alertMsg && (
-        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {alertMsg}
         </div>
       )}
 
-      {/* Barra de búsqueda */}
-      <div className="mt-6 bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+      {/* ========================= */}
+      {/* BARRA DE BÚSQUEDA */}
+      {/* ========================= */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
-          {/* Destino */}
+          {/* DESTINO */}
           <div className="lg:col-span-5 relative">
-            <label className="text-xs text-slate-600 font-semibold">
-              Destino
-            </label>
+            <label className="text-xs text-slate-600 font-semibold">Destino</label>
             <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
               <Search className="w-4 h-4 text-slate-500" />
               <input
@@ -179,16 +217,14 @@ export default function LodgingPage() {
                     }}
                   >
                     <div className="font-medium">{p.city}</div>
-                    <div className="text-xs text-slate-500">
-                      {p.country}
-                    </div>
+                    <div className="text-xs text-slate-500">{p.country}</div>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Check-in */}
+          {/* CHECK-IN */}
           <div className="lg:col-span-2">
             <label className="text-xs font-semibold">Check-in</label>
             <input
@@ -199,7 +235,7 @@ export default function LodgingPage() {
             />
           </div>
 
-          {/* Check-out */}
+          {/* CHECK-OUT */}
           <div className="lg:col-span-2">
             <label className="text-xs font-semibold">Check-out</label>
             <input
@@ -210,7 +246,7 @@ export default function LodgingPage() {
             />
           </div>
 
-          {/* Personas */}
+          {/* PERSONAS */}
           <div className="lg:col-span-2">
             <label className="text-xs font-semibold">Personas</label>
             <input
@@ -222,6 +258,7 @@ export default function LodgingPage() {
             />
           </div>
 
+          {/* INFO NOCHE / PERSONAS */}
           <div className="lg:col-span-1 text-xs text-slate-600">
             <div className="font-semibold">{nights} noche(s)</div>
             <div>{guests} persona(s)</div>
@@ -229,56 +266,53 @@ export default function LodgingPage() {
         </div>
       </div>
 
-      {/* Resultados */}
-      <div className={`mt-6 grid gap-6 ${mapMode ? "lg:grid-cols-12" : ""}`}>
+      {/* ========================= */}
+      {/* RESULTADOS */}
+      {/* ========================= */}
+      <div className={`grid gap-6 ${mapMode ? "lg:grid-cols-12" : ""}`}>
         {mapMode && hasDestination && (
           <div className="lg:col-span-8">
             <LodgingMap
               hotels={results}
               guests={guests}
               nights={nights}
-              onSelectHotel={onSelectHotel}
+              onSelectHotel={(h) => console.log("Seleccionado:", h)}
               focus={selectedPlace}
             />
           </div>
         )}
 
         <div className={mapMode ? "lg:col-span-4" : ""}>
-          <div className="bg-white border rounded-2xl p-4 shadow-sm">
-            <h2 className="font-bold">Resultados</h2>
+          <div className="grid gap-4">
+            {loading && <p className="text-slate-600">Buscando hoteles...</p>}
+            {!hasDestination && !loading && <p className="text-slate-600">Selecciona una ciudad para buscar hoteles.</p>}
+            {hasDestination && !loading && results.length === 0 && <p className="text-slate-600">No se encontraron hoteles.</p>}
 
-            {loading && (
-              <div className="mt-3 text-sm text-slate-600">
-                Buscando hoteles…
+            {results.map((h) => (
+              <div key={h.id} className="bg-white border rounded-2xl p-4 shadow hover:shadow-md transition flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-lg">{h.name}</h3>
+                  <p className="text-sm text-slate-600">{h.city}{h.country && `, ${h.country}`}</p>
+                  <p className="text-sm text-slate-600 mt-1">Precio base: COP {h.basePrice}</p>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <button
+                    onClick={() => onReserveHotel(h)}
+                    className="px-3 py-1 rounded-lg bg-sky-600 text-white hover:bg-sky-500 text-sm"
+                  >
+                    Reservar
+                  </button>
+                  <a
+                    href={`https://www.openstreetmap.org/${h.osm_type}/${h.osm_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm"
+                  >
+                    Ver alojamiento
+                  </a>
+                </div>
               </div>
-            )}
-
-            {!hasDestination && (
-              <div className="mt-3 text-sm text-slate-600">
-                Selecciona una ciudad para buscar hoteles.
-              </div>
-            )}
-
-            {hasDestination && !loading && results.length === 0 && (
-              <div className="mt-3 text-sm text-slate-600">
-                No se encontraron hoteles.
-              </div>
-            )}
-
-            <div className="mt-3 space-y-3">
-              {results.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => onSelectHotel(h)}
-                  className="w-full text-left rounded-xl border p-3 hover:bg-slate-50"
-                >
-                  <div className="font-semibold">{h.name}</div>
-                  <div className="text-sm text-slate-600">
-                    {h.city} {h.country && `, ${h.country}`}
-                  </div>
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
       </div>

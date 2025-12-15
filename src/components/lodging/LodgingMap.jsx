@@ -1,25 +1,24 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { ensureHotelPrice } from "../../services/pricesApi";
 
-// ✅ Componente interno: actualiza vista del mapa cuando cambia el foco
+// Componente interno para centrar mapa según foco
 function MapFocus({ focus, hotels }) {
   const map = useMap();
 
   useEffect(() => {
-    // 1) Si hay bbox de Nominatim: encuadra la ciudad
     if (focus?.bbox?.length === 4) {
       const [south, north, west, east] = focus.bbox;
-      const bounds = [
-        [south, west],
-        [north, east],
-      ];
-      map.fitBounds(bounds, { padding: [30, 30] });
+      map.fitBounds(
+        [
+          [south, west],
+          [north, east],
+        ],
+        { padding: [30, 30] }
+      );
       return;
     }
-
-    // 2) Si no hay bbox pero hay hoteles: centra en el primer hotel
     if (hotels?.length) {
       const h = hotels[0];
       if (Number.isFinite(h.lat) && Number.isFinite(h.lng)) {
@@ -45,7 +44,6 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
   const [markers, setMarkers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Centro inicial (solo para el primer render). Luego MapFocus manda.
   const initialCenter = useMemo(() => {
     if (focus?.lat && focus?.lon) return [focus.lat, focus.lon];
     return [15, 0];
@@ -61,7 +59,6 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
 
     let cancelled = false;
 
-    // ✅ precio fallback determinístico (sin backend)
     const fallbackBasePrice = (h) => {
       const seed = `${h.osmType}-${h.osmId}-${h.name || ""}`;
       let hash = 0;
@@ -72,7 +69,7 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
     async function loadPrices() {
       setLoading(true);
 
-      // ✅ 1) pinta markers inmediatamente con fallback (para que se vean YA)
+      // 1️⃣ Fallback instantáneo
       const instant = hotels.map((h) => {
         const basePrice = fallbackBasePrice(h);
         const total = Math.max(1, guests) * Math.max(1, nights) * basePrice;
@@ -88,7 +85,7 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
 
       if (!cancelled) setMarkers(instant);
 
-      // ✅ 2) intenta mejorar con backend (si falla, no pasa nada)
+      // 2️⃣ Backend para precios reales
       try {
         const enriched = await Promise.all(
           hotels.map(async (h) => {
@@ -108,7 +105,6 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
             return { ...h, basePrice, total, icon };
           })
         );
-
         if (!cancelled) setMarkers(enriched);
       } catch (e) {
         console.warn("Backend de precios no respondió; usando fallback local.");
@@ -118,12 +114,8 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
     }
 
     loadPrices();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [hotels, guests, nights]);
-
 
   return (
     <div className="relative w-full h-[520px] rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
@@ -141,8 +133,6 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
         worldCopyJump
       >
         <TileLayer url={tileUrl} attribution={attribution} maxZoom={20} />
-
-        {/* ✅ Esto es lo que arregla lo del mapamundi */}
         <MapFocus focus={focus} hotels={markers} />
 
         {markers.map((m) => (
@@ -150,30 +140,39 @@ export default function LodgingMap({ hotels, guests, nights, onSelectHotel, focu
             key={`${m.osmType}-${m.osmId}`}
             position={[m.lat, m.lng]}
             icon={m.icon}
-            eventHandlers={{ click: () => onSelectHotel?.(m) }}
           >
             <Popup>
-              <div className="space-y-1">
-                <div className="font-semibold">{m.name}</div>
-                <div className="text-sm text-slate-600">{m.city}</div>
+              <div className="space-y-2">
+                <div className="font-semibold text-slate-900">{m.name}</div>
+                <div className="text-sm text-slate-600">{m.city}, {m.country || "desconocido"}</div>
 
                 <div className="text-sm">
                   <span className="text-slate-600">Precio base:</span>{" "}
-                  <span className="font-semibold">${m.basePrice}</span>{" "}
-                  <span className="text-slate-600">/noche/persona</span>
+                  <span className="font-semibold">${m.basePrice}</span> <span className="text-slate-600">/noche/persona</span>
                 </div>
-
                 <div className="text-sm">
                   <span className="text-slate-600">Total:</span>{" "}
                   <span className="font-bold">${m.total}</span>
                 </div>
 
-                <button
-                  className="mt-2 w-full rounded-lg bg-sky-600 px-3 py-2 text-sm text-white hover:bg-sky-500 transition"
-                  onClick={() => onSelectHotel?.(m)}
-                >
-                  Ver alojamiento
-                </button>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    className="flex-1 rounded-lg bg-sky-600 px-3 py-2 text-sm text-white hover:bg-sky-500 transition"
+                    onClick={() => onSelectHotel(m)}
+                  >
+                    Reservar
+                  </button>
+
+                  <button
+                    className="flex-1 rounded-lg bg-gray-200 px-3 py-2 text-sm text-slate-700 hover:bg-gray-300 transition"
+                    onClick={() => {
+                      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(m.name)},${encodeURIComponent(m.city)}`;
+                      window.open(mapsUrl, "_blank");
+                    }}
+                  >
+                    Ver alojamiento
+                  </button>
+                </div>
               </div>
             </Popup>
           </Marker>
