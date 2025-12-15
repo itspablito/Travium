@@ -1,21 +1,30 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true); // true = login
   const [formData, setFormData] = useState({ username: "", email: "", password: "" });
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const url = isLogin ? "/api/auth/login" : "/api/auth/register";
+    const url = isLogin ? 'http://localhost:3002/api/auth/login'
+                        : 'http://localhost:3002/api/auth/register';
 
     try {
       const res = await axios.post(url, formData);
       console.log("Respuesta del servidor:", res.data);
-      alert(isLogin ? "Login exitoso!" : "Registro exitoso!");
-      if (isLogin) localStorage.setItem("token", res.data.token);
+      if (isLogin) {
+        login(res.data.user, res.data.token);
+        navigate('/');
+      } else {
+        alert("Registro exitoso!");
+      }
     } catch (err) {
       console.error(err.response?.data || err);
       alert(err.response?.data?.error || "Error del servidor");

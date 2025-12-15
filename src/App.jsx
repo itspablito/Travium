@@ -10,28 +10,35 @@ import VehiclesPage from './pages/vehicles/VehiclesPage'
 import ExperiencesPage from './pages/user/ExperiencesPage'
 import ReservationsPage from './pages/user/ReservationsPage'
 import CheckoutPage from './pages/payment/CheckoutPage'
+import ProfilePage from './pages/user/ProfilePage'
+import SettingsPage from './pages/user/SettingsPage'
+import { AuthProvider } from './contexts/AuthContext'
 
 function App() {
   return (
-    <div className="min-h-screen flex flex-col bg-white text-slate-900">
-      <Navbar />
+    <AuthProvider>
+      <div className="min-h-screen flex flex-col bg-white text-slate-900">
+        <Navbar />
 
-      <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/flights" element={<FlightsPage />} />
-          <Route path="/lodging" element={<LodgingPage />} />
-          <Route path="/login" element={<Loging />} />
-          <Route path="/vehicles" element={<VehiclesPage />} />
-          <Route path="/experiences" element={<ExperiencesPage />} />
-          <Route path="/reservations" element={<ReservationsPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/services" element={<ServicesPage />} />
-        </Routes>
-      </main>
+        <main className="flex-1">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/flights" element={<FlightsPage />} />
+            <Route path="/lodging" element={<LodgingPage />} />
+            <Route path="/login" element={<Loging />} />
+            <Route path="/vehicles" element={<VehiclesPage />} />
+            <Route path="/experiences" element={<ExperiencesPage />} />
+            <Route path="/reservations" element={<ReservationsPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Routes>
+        </main>
 
-      <Footer />
-    </div>
+        <Footer />
+      </div>
+    </AuthProvider>
   )
 }
 
