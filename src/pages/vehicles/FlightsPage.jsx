@@ -17,8 +17,12 @@ import {
   ArrowRight,
   X,
   Plus,
+  Check,
 } from "lucide-react";
 import { searchFlights } from "../../services/flightsApi";
+import { createFlightReservation } from "../../services/reservationsApi";
+import { createFlightInvoice } from "../../services/invoicesApi";
+import PaymentModal from "../../components/common/PaymentModal";
 
 /* =========================================================
    MOCK DATA (luego lo reemplazas por tu backend)
@@ -383,6 +387,7 @@ export default function FlightsPage() {
       // Use real flights from database (tabla vuelos)
       const flights = realFlights.map((flight) => ({
         id: `flight-${flight.id}`,
+        dbId: flight.id, // ID numérico real de la base de datos
         airline: flight.aerolinea || "Aerolínea",
         from: flight.aeropuerto_origen || activeFrom?.code,
         to: flight.aeropuerto_destino || activeTo?.code,
@@ -950,7 +955,7 @@ export default function FlightsPage() {
             ) : (
               <>
                 {resultsFiltered.map((r, idx) => (
-                  <FlightCard key={r.id} flight={r} highlight={idx === 0} />
+                  <FlightCard key={r.id} flight={r} highlight={idx === 0} paxTotal={paxTotal} />
                 ))}
 
                 {!resultsFiltered.length && (
@@ -1342,11 +1347,14 @@ function FareComparisonStrip({ best }) {
   );
 }
 
-function FlightCard({ flight, highlight }) {
+function FlightCard({ flight, highlight, paxTotal = 1 }) {
+  const [selectedFare, setSelectedFare] = useState("standard");
   const durH = Math.floor(flight.durationMin / 60);
   const durM = flight.durationMin % 60;
 
   const stopText = flight.stops === 0 ? "Directo" : flight.stops === 1 ? "1 escala" : `${flight.stops} escalas`;
+
+  const currentPrice = (flight.fareTiers[selectedFare] || flight.total) * paxTotal;
 
   return (
     <div
@@ -1401,24 +1409,47 @@ function FlightCard({ flight, highlight }) {
 
         <div className="flex-1 min-w-[220px]">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="text-xs font-semibold text-slate-700">Tarifa rápida</div>
+            <div className="text-xs font-semibold text-slate-700">Tarifa rápida {paxTotal > 1 ? `(${paxTotal} pasajeros)` : ''}</div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-              <MiniFare label="Basic" price={flight.fareTiers.basic} />
-              <MiniFare label="Estándar" price={flight.fareTiers.standard} active />
-              <MiniFare label="Flexible" price={flight.fareTiers.flexible} />
-              <MiniFare label="Premium" price={flight.fareTiers.premium} />
+              <MiniFare 
+                label="Basic" 
+                price={flight.fareTiers.basic * paxTotal} 
+                active={selectedFare === "basic"}
+                onClick={() => setSelectedFare("basic")}
+              />
+              <MiniFare 
+                label="Estándar" 
+                price={flight.fareTiers.standard * paxTotal} 
+                active={selectedFare === "standard"}
+                onClick={() => setSelectedFare("standard")}
+              />
+              <MiniFare 
+                label="Flexible" 
+                price={flight.fareTiers.flexible * paxTotal} 
+                active={selectedFare === "flexible"}
+                onClick={() => setSelectedFare("flexible")}
+              />
+              <MiniFare 
+                label="Premium" 
+                price={flight.fareTiers.premium * paxTotal} 
+                active={selectedFare === "premium"}
+                onClick={() => setSelectedFare("premium")}
+              />
             </div>
           </div>
         </div>
 
         <div className="min-w-[180px] text-right">
           <div className="text-xs text-slate-500">Precio total</div>
-          <div className="text-2xl font-extrabold text-slate-900">{money(flight.total)}</div>
-          <div className="text-xs text-slate-600 mt-1">Impuestos incluidos (mock)</div>
+          <div className="text-2xl font-extrabold text-slate-900">{money(currentPrice)}</div>
+          <div className="text-xs text-slate-600 mt-1">Impuestos incluidos</div>
 
-          <button className="mt-3 w-full px-4 py-2 rounded-xl bg-sky-600 text-white font-semibold hover:bg-sky-500 transition shadow">
-            Ver detalles
-          </button>
+          <ComprarBoletaButton 
+            flight={flight} 
+            selectedFare={selectedFare}
+            currentPrice={currentPrice}
+            paxTotal={paxTotal}
+          />
 
           <button className="mt-2 w-full px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-900 text-sm font-semibold transition">
             Comparar
@@ -1429,12 +1460,105 @@ function FlightCard({ flight, highlight }) {
   );
 }
 
-function MiniFare({ label, price, active }) {
+// Componente para comprar boleta
+function ComprarBoletaButton({ flight, selectedFare, currentPrice, paxTotal = 1 }) {
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  async function handlePaymentSuccess(paymentData) {
+    setLoading(true);
+    setShowPaymentModal(false);
+    
+    try {
+      // NOTA: En producción, user_id vendría del contexto de autenticación
+      const userId = 2; // Usuario de prueba
+      const departDate = new Date().toISOString().split('T')[0];
+      
+      // 1. Crear la reserva
+      const reservation = await createFlightReservation({
+        userId,
+        flight: {
+          ...flight,
+          fareTiers: {
+            ...flight.fareTiers,
+            [selectedFare]: currentPrice // Usar el precio ya multiplicado
+          }
+        },
+        selectedFare,
+        departDate,
+      });
+
+      // 2. Crear la factura
+      await createFlightInvoice({
+        reservation,
+        paymentData,
+        flightData: {
+          origin: flight.origin,
+          destination: flight.destination,
+          airline: flight.airline,
+          departureDate: departDate,
+          returnDate: null,
+          passengers: paxTotal,
+        },
+      });
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (error) {
+      console.error('Error creando reserva/factura:', error);
+      alert('Error al procesar la compra. Por favor intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <button className="mt-3 w-full px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold transition shadow inline-flex items-center justify-center gap-2">
+        <Check className="w-5 h-5" />
+        ¡Comprado!
+      </button>
+    );
+  }
+
   return (
-    <div className={`rounded-lg border px-2 py-2 ${active ? "border-sky-200 bg-white" : "border-slate-200 bg-white/70"}`}>
-      <div className="text-slate-600 font-semibold">{label}</div>
-      <div className="text-slate-900 font-extrabold">{money(price)}</div>
-    </div>
+    <>
+      <button 
+        onClick={() => setShowPaymentModal(true)}
+        disabled={loading}
+        className="mt-3 w-full px-4 py-2 rounded-xl bg-sky-600 text-white font-semibold hover:bg-sky-500 transition shadow disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Procesando...' : 'Comprar boleta'}
+      </button>
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        amount={currentPrice}
+        onPaymentSuccess={handlePaymentSuccess}
+        purchaseData={{
+          type: 'vuelo',
+          description: `${flight.origin} → ${flight.destination} - ${flight.airline} - ${paxTotal} pasajero${paxTotal > 1 ? 's' : ''}`,
+        }}
+      />
+    </>
+  );
+}
+
+function MiniFare({ label, price, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border px-2 py-2 transition-all cursor-pointer hover:shadow-md ${
+        active 
+          ? "border-sky-500 bg-sky-50 ring-2 ring-sky-200" 
+          : "border-slate-200 bg-white/70 hover:bg-white hover:border-sky-300"
+      }`}
+    >
+      <div className={`font-semibold ${active ? "text-sky-700" : "text-slate-600"}`}>{label}</div>
+      <div className={`font-extrabold ${active ? "text-sky-900" : "text-slate-900"}`}>{money(price)}</div>
+    </button>
   );
 }
 

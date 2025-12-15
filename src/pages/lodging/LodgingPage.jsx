@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Map, X, Search } from "lucide-react";
+import { Map, X, Search, Check } from "lucide-react";
 import LodgingMap from "../../components/lodging/lodgingMap";
 import { fetchHotelsByCity } from "../../services/overpassApi";
 import { searchCities } from "../../services/nominatimApi";
 import { useAuth } from "../../contexts/AuthContext";
+import { createLodgingReservation } from "../../services/reservationsApi";
+import { createLodgingInvoice } from "../../services/invoicesApi";
+import PaymentModal from "../../components/common/PaymentModal";
 
 function daysBetweenISO(checkIn, checkOut) {
   if (!checkIn || !checkOut) return 1;
@@ -32,6 +35,11 @@ export default function LodgingPage() {
 
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Payment modal
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedHotel, setSelectedHotel] = useState(null);
+  const [hotelTotalPrice, setHotelTotalPrice] = useState(0);
 
   const nights = useMemo(
     () => daysBetweenISO(checkIn, checkOut),
@@ -119,34 +127,59 @@ export default function LodgingPage() {
       return;
     }
 
+    if (!checkIn || !checkOut) {
+      alert("Debes seleccionar fechas de check-in y check-out.");
+      return;
+    }
+
+    const totalPrice = (hotel.basePrice || 50) * nights;
+    setSelectedHotel(hotel);
+    setHotelTotalPrice(totalPrice);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = async (paymentData) => {
+    setShowPaymentModal(false);
+    
     try {
-      const response = await fetch("http://localhost:3001/api/reservations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+      // 1. Crear la reserva
+      const reservation = await createLodgingReservation({
+        userId: user.id,
+        lodging: {
+          id: selectedHotel.osm_id || selectedHotel.osmId,
+          name: selectedHotel.name,
+          city: selectedHotel.city,
+          country: selectedHotel.country || "desconocido",
+          address: selectedHotel.address || selectedHotel.name,
+          lat: selectedHotel.lat,
+          lng: selectedHotel.lon || selectedHotel.lng,
+          osm_type: selectedHotel.osm_type || selectedHotel.osmType,
+          osm_id: selectedHotel.osm_id || selectedHotel.osmId,
         },
-        body: JSON.stringify({
-          hotelName: hotel.name,
-          osmType: hotel.osm_type || hotel.osmType,
-          osmId: hotel.osm_id || hotel.osmId,
-          city: hotel.city,
-          country: hotel.country || "desconocido",
-          checkIn, 
-          checkOut,
-          guests,
-          basePrice: hotel.basePrice || 50,
-        }),
+        checkIn,
+        checkOut,
+        guests,
+        totalPrice: hotelTotalPrice,
       });
-      const data = await response.json();
-      if (response.ok) {
-        alert(`Reserva creada! Total: COP ${data.reservation.total_price}`);
-      } else {
-        alert(`Error: ${data.error}`);
-      }
+
+      // 2. Crear la factura
+      await createLodgingInvoice({
+        reservation,
+        paymentData,
+        lodgingData: {
+          name: selectedHotel.name,
+          city: selectedHotel.city,
+          country: selectedHotel.country || "desconocido",
+          checkIn,
+          checkOut,
+          nights,
+        },
+      });
+
+      alert(`¡Reserva y factura creadas exitosamente! Total: $${hotelTotalPrice} (${nights} noches)`);
     } catch (err) {
       console.error(err);
-      alert("Error creando reserva");
+      alert("Error creando reserva. Por favor intenta de nuevo.");
     }
   };
 
@@ -316,6 +349,18 @@ export default function LodgingPage() {
           </div>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        amount={hotelTotalPrice}
+        onPaymentSuccess={handlePaymentSuccess}
+        purchaseData={{
+          type: 'alojamiento',
+          description: selectedHotel ? `${selectedHotel.name} - ${selectedHotel.city} - ${nights} noche${nights > 1 ? 's' : ''}` : '',
+        }}
+      />
     </div>
   );
 }
