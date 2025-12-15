@@ -36,7 +36,8 @@ async function initDB() {
     console.log("✅ Conectado a tabla 'vuelos' existente");
     console.log("📋 Columnas disponibles:", result.rows.map(r => r.column_name).join(", "));
   } catch (err) {
-    console.error("⚠️  Error verificando tabla vuelos:", err.message);
+    console.error("⚠️ Error verificando tabla vuelos:", err.message);
+    console.error(err.stack); // Agrega un stack trace para más detalles
   }
 }
 
