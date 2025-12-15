@@ -1,0 +1,20 @@
+{
+  "name": "services_server",
+  "version": "1.0.0",
+  "description": "API para gestión de servicios - Travium",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js"
+  },
+  "keywords": ["services", "api", "travium"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "pg": "^8.12.0"
+  }
+}

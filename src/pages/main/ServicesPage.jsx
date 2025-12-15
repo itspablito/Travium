@@ -15,6 +15,7 @@ import {
   Map as MapIcon,
   LocateFixed,
 } from "lucide-react";
+import { servicesApi } from "../../services/servicesApi";
 
 /* =========================================================
    MOCK DATA (luego lo cambias por Google Places / backend)
@@ -788,20 +789,25 @@ function priceLabel(level) {
 ========================================================= */
 
 export default function ServicesPage() {
-  const [city, setCity] = useState(CITIES[0]);
+  // Estado para datos reales de la base de datos
+  const [realServices, setRealServices] = useState([]);
+  const [availableCities, setAvailableCities] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [city, setCity] = useState(null);
   const [useMyLocation, setUseMyLocation] = useState(false);
 
   // mock "my location": si no usamos ubicación, usamos centro de ciudad
-  const [myPos, setMyPos] = useState({ lat: city.lat, lng: city.lng });
+  const [myPos, setMyPos] = useState({ lat: 4.711, lng: -74.0721 }); // Default: Bogotá
 
   const [query, setQuery] = useState("");
   const [showSug, setShowSug] = useState(false);
 
-  const [activeCat, setActiveCat] = useState("pharmacy");
+  const [activeCat, setActiveCat] = useState(null);
   const [view, setView] = useState("list"); // list | map
 
   // filtros
-  const [nearKm, setNearKm] = useState(8); // filtro por cercanía
+  const [nearKm, setNearKm] = useState(25); // filtro por cercanía - aumentado para mostrar todos por defecto
   const [openNow, setOpenNow] = useState(false);
   const [open24h, setOpen24h] = useState(false);
   const [bestRated, setBestRated] = useState(false);
@@ -812,6 +818,48 @@ export default function ServicesPage() {
   const [selected, setSelected] = useState(null);
   const [favorites, setFavorites] = useState(new Set());
   const [history, setHistory] = useState([]);
+
+  // Cargar todos los servicios y extraer ciudades únicas al montar el componente
+  useEffect(() => {
+    async function loadServices() {
+      setIsLoading(true);
+      try {
+        const services = await servicesApi.getAllServices();
+        setRealServices(services);
+
+        // Extraer ciudades únicas
+        const citiesMap = new Map();
+        services.forEach(service => {
+          if (service.ciudad && !citiesMap.has(service.ciudad)) {
+            citiesMap.set(service.ciudad, {
+              id: service.ciudad.toLowerCase().replace(/\s+/g, '-'),
+              name: service.ciudad,
+              country: service.pais || "Colombia",
+              lat: service.latitud || 0,
+              lng: service.longitud || 0,
+            });
+          }
+        });
+        const cities = Array.from(citiesMap.values());
+        setAvailableCities(cities);
+        
+        // Establecer primera ciudad de la BD si hay datos
+        if (cities.length > 0) {
+          setCity(cities[0]);
+          setMyPos({ lat: cities[0].lat, lng: cities[0].lng });
+        }
+      } catch (error) {
+        console.error("Error loading services:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadServices();
+  }, []);
+
+  // Usar CITIES de fallback si no hay ciudades de la BD
+  const CITIES_TO_USE = availableCities.length > 0 ? availableCities : CITIES;
 
   // microcopy contextual
   const tip = useMemo(() => {
@@ -826,14 +874,33 @@ export default function ServicesPage() {
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return MOCK_PLACES.filter(p => p.cityId === city.id)
-      .filter(p => `${p.name} ${p.address}`.toLowerCase().includes(q))
+    
+    // Usar servicios reales si están disponibles
+    const servicesToSearch = realServices.length > 0 ? realServices : MOCK_PLACES;
+    
+    return servicesToSearch
+      .filter(p => {
+        // Si hay ciudad seleccionada, filtrar por ciudad
+        if (city) {
+          const cityMatch = realServices.length > 0 
+            ? p.ciudad === city.name
+            : p.cityId === city.id;
+          if (!cityMatch) return false;
+        }
+        
+        const searchText = realServices.length > 0
+          ? `${p.nombre} ${p.direccion}`.toLowerCase()
+          : `${p.name} ${p.address}`.toLowerCase();
+        return searchText.includes(q);
+      })
       .slice(0, 6);
-  }, [query, city.id]);
+  }, [query, city, realServices]);
 
   // recomputar posición al cambiar ciudad (si no usas ubicación)
   useEffect(() => {
-    if (!useMyLocation) setMyPos({ lat: city.lat, lng: city.lng });
+    if (!useMyLocation && city) {
+      setMyPos({ lat: city.lat, lng: city.lng });
+    }
   }, [city, useMyLocation]);
 
   async function handleUseMyLocation() {
@@ -846,14 +913,16 @@ export default function ServicesPage() {
           setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         },
         () => {
-          // fallback mock si el usuario niega
-          setMyPos({ lat: city.lat, lng: city.lng });
+          // fallback: usar ciudad actual o Bogotá
+          const fallbackCity = city || CITIES[0];
+          setMyPos({ lat: fallbackCity.lat, lng: fallbackCity.lng });
         },
         { enableHighAccuracy: true, timeout: 7000 }
       );
     } else {
       // fallback
-      setMyPos({ lat: city.lat, lng: city.lng });
+      const fallbackCity = city || CITIES[0];
+      setMyPos({ lat: fallbackCity.lat, lng: fallbackCity.lng });
     }
   }
 
@@ -877,15 +946,68 @@ export default function ServicesPage() {
   }
 
   const filteredPlaces = useMemo(() => {
-    const base = MOCK_PLACES.filter(p => p.cityId === city.id && p.category === activeCat);
+    // Establecer posición por defecto si no hay
+    const currentPos = myPos || { lat: CITIES[0].lat, lng: CITIES[0].lng };
+    
+    // Usar servicios reales si están disponibles, sino usar MOCK_PLACES
+    const servicesToFilter = realServices.length > 0 ? realServices : MOCK_PLACES;
+    
+    const base = servicesToFilter.filter(p => {
+      // Si no hay ciudad seleccionada, mostrar todos
+      const cityMatch = !city || (realServices.length > 0 
+        ? p.ciudad === city.name
+        : p.cityId === city.id);
+      
+      // Si no hay categoría seleccionada, mostrar todas
+      const categoryMatch = !activeCat || (realServices.length > 0
+        ? p.categoria === activeCat
+        : p.category === activeCat);
+      
+      return cityMatch && categoryMatch;
+    });
 
     return base
-      .map(p => ({
-        ...p,
-        isOpen: isOpenNow(p.open),
-        distanceKm: kmApprox(myPos, p),
-      }))
-      .filter(p => p.distanceKm <= nearKm)
+      .map(p => {
+        // Adaptar estructura de servicio real a la esperada por el UI
+        if (realServices.length > 0) {
+          const open = {
+            is24h: p.abierto_24h || false,
+            opens: p.hora_apertura || "00:00",
+            closes: p.hora_cierre || "23:59"
+          };
+          
+          return {
+            id: p.id,
+            name: p.nombre,
+            category: p.categoria,
+            address: p.direccion,
+            phone: p.telefono,
+            rating: p.rating || 0,
+            priceLevel: p.nivel_precios || "mid",
+            foodType: p.tipo_comida,
+            open: open,
+            lat: p.latitud,
+            lng: p.longitud,
+            images: Array.isArray(p.imagenes) ? p.imagenes : (p.imagenes ? [p.imagenes] : ["https://picsum.photos/seed/service/900/600"]),
+            description: p.descripcion,
+            isOpen: isOpenNow(open),
+            distanceKm: kmApprox(currentPos, { lat: p.latitud, lng: p.longitud }),
+          };
+        }
+        
+        // Para MOCK_PLACES
+        return {
+          ...p,
+          isOpen: isOpenNow(p.open),
+          distanceKm: kmApprox(currentPos, p),
+        };
+      })
+      .filter(p => {
+        // Si no hay ciudad seleccionada, no filtrar por distancia (mostrar todos)
+        if (!city) return true;
+        // Si hay ciudad seleccionada, aplicar filtro de distancia
+        return p.distanceKm <= nearKm;
+      })
       .filter(p => (openNow ? p.isOpen : true))
       .filter(p => (open24h ? p.open?.is24h : true))
       .filter(p => (priceLevel !== "any" ? p.priceLevel === priceLevel : true))
@@ -899,7 +1021,7 @@ export default function ServicesPage() {
         // por defecto: cercanía + rating
         return a.distanceKm - b.distanceKm || b.rating - a.rating;
       });
-  }, [activeCat, bestRated, city.id, foodType, nearKm, open24h, openNow, priceLevel, myPos]);
+  }, [activeCat, bestRated, city, foodType, nearKm, open24h, openNow, priceLevel, myPos, realServices]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
@@ -943,13 +1065,22 @@ export default function ServicesPage() {
             <label className="text-xs text-slate-600 font-semibold">Ciudad destino</label>
             <select
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-              value={city.id}
+              value={city?.id || ""}
               onChange={(e) => {
-                const next = CITIES.find(c => c.id === e.target.value);
-                if (next) setCity(next);
+                if (!e.target.value) {
+                  setCity(null);
+                  setMyPos(null);
+                  return;
+                }
+                const next = CITIES_TO_USE.find(c => c.id === e.target.value);
+                if (next) {
+                  setCity(next);
+                  setMyPos({ lat: next.lat, lng: next.lng });
+                }
               }}
             >
-              {CITIES.map(c => (
+              <option value="">Todas las ciudades</option>
+              {CITIES_TO_USE.map(c => (
                 <option key={c.id} value={c.id}>{c.name} · {c.country}</option>
               ))}
             </select>
@@ -990,23 +1121,29 @@ export default function ServicesPage() {
 
             {showSug && suggestions.length > 0 && (
               <div className="absolute z-30 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-                {suggestions.map(p => (
-                  <button
-                    key={p.id}
-                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handlePickPlace(p)}
-                    type="button"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold text-slate-900">{p.name}</div>
-                      <span className="text-xs text-slate-500">{p.address}</span>
-                    </div>
-                    <div className="text-xs text-slate-600">
-                      {CATEGORIES.find(c => c.id === p.category)?.label ?? "Servicio"}
-                    </div>
-                  </button>
-                ))}
+                {suggestions.map(p => {
+                  const displayName = realServices.length > 0 ? p.nombre : p.name;
+                  const displayAddress = realServices.length > 0 ? p.direccion : p.address;
+                  const displayCategory = realServices.length > 0 ? p.categoria : p.category;
+                  
+                  return (
+                    <button
+                      key={p.id}
+                      className="w-full text-left px-4 py-3 hover:bg-slate-50 transition"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handlePickPlace(p)}
+                      type="button"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-slate-900">{displayName}</div>
+                        <span className="text-xs text-slate-500">{displayAddress}</span>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {CATEGORIES.find(c => c.id === displayCategory)?.label ?? "Servicio"}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1040,7 +1177,7 @@ export default function ServicesPage() {
             return (
               <button
                 key={cat.id}
-                onClick={() => setActiveCat(cat.id)}
+                onClick={() => setActiveCat(active ? null : cat.id)}
                 className={`rounded-2xl border p-4 text-left shadow-sm transition hover:bg-slate-50 ${
                   active ? cat.color : "bg-white border-slate-200 text-slate-800"
                 }`}
@@ -1048,7 +1185,7 @@ export default function ServicesPage() {
               >
                 <div className="text-2xl">{cat.emoji}</div>
                 <div className="mt-2 font-bold">{cat.label}</div>
-                <div className="text-xs mt-1 opacity-80">Explorar cerca</div>
+                <div className="text-xs mt-1 opacity-80">{active ? "Seleccionado" : "Explorar cerca"}</div>
               </button>
             );
           })}
@@ -1171,17 +1308,17 @@ export default function ServicesPage() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="text-sm text-slate-600">
               Mostrando <span className="font-semibold text-slate-900">{filteredPlaces.length}</span> resultados en{" "}
-              <span className="font-semibold text-slate-900">{city.name}</span>.
+              <span className="font-semibold text-slate-900">{city?.name || "todas las ciudades"}</span>.
             </div>
             <div className="text-xs text-slate-500 inline-flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Estado “Abierto” se calcula con la hora actual (mock).
+              Estado “Abierto” se calcula con la hora actual.
             </div>
           </div>
 
           {view === "map" ? (
             <MapMock
-              city={city}
+              city={city || CITIES[0]}
               myPos={myPos}
               points={filteredPlaces}
               onSelect={(p) => setSelected(p)}
@@ -1197,7 +1334,10 @@ export default function ServicesPage() {
                   onFav={() => toggleFavorite(p.id)}
                   onOpen={() => setSelected(p)}
                   onCall={() => window.open(`tel:${p.phone}`, "_self")}
-                  onDirections={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`, "_blank")}
+                  onDirections={() => {
+                    const destination = encodeURIComponent(p.address);
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${destination}`, "_blank");
+                  }}
                 />
               ))}
 
@@ -1336,7 +1476,7 @@ function MapMock({ city, myPos, points, onSelect, activeCat }) {
         <div>
           <div className="font-bold text-slate-900">Mapa (mock)</div>
           <div className="text-sm text-slate-600">
-            Pines de {cat?.label ?? "servicios"} en {city.name}. (Luego conectas Leaflet/Mapbox)
+            Pines de {cat?.label ?? "servicios"} en {city?.name || "todas las ciudades"}. (Luego conectas Leaflet/Mapbox)
           </div>
         </div>
         <div className="text-xs text-slate-500 inline-flex items-center gap-2">
@@ -1495,7 +1635,10 @@ function DetailModal({ place, isFav, onFav, onClose }) {
                   </button>
 
                   <button
-                    onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`, "_blank")}
+                    onClick={() => {
+                      const destination = encodeURIComponent(place.address);
+                      window.open(`https://www.google.com/maps/search/?api=1&query=${destination}`, "_blank");
+                    }}
                     className="mt-2 w-full px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-900 font-semibold transition inline-flex items-center justify-center gap-2"
                     type="button"
                   >
