@@ -1,7 +1,7 @@
 {
-  "name": "server",
+  "name": "lodging_server",
   "version": "1.0.0",
-  "description": "Backend Travium",
+  "description": "Backend Travium - Alojamiento",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -14,7 +14,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.19.2",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:flights\" \"npm run dev:services\" --names \"Frontend,Flights,Services\" --prefix-colors \"cyan,yellow,green\"",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:flights\" \"npm run dev:services\" \"npm run dev:login\" \"npm run dev:lodging\" \"npm run dev:reservations\" \"npm run dev:invoices\" --names \"Frontend,Flights,Services,Login,Lodging,Reservations,Invoices\" --prefix-colors \"cyan,yellow,green,magenta,blue,red,white\"",
     "dev:flights": "cd server/fly_server && npm run dev",
     "dev:services": "cd server/services_server && npm run dev",
+    "dev:login": "cd server/login_server && npm run dev",
+    "dev:lodging": "cd server/lodging_server && npm run dev",
+    "dev:reservations": "cd server/reservations_server && npm run dev",
+    "dev:invoices": "cd server/invoices_server && npm run dev",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
