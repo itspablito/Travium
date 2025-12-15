@@ -10,6 +10,6 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 
-app.listen(process.env.PORT || 3001, () => {
-  console.log('Servidor corriendo en puerto', process.env.PORT || 3001);
+app.listen(process.env.PORT || 3004, () => {
+  console.log('Servidor corriendo en puerto', process.env.PORT || 3004);
 });
