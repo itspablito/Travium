@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   ArrowLeftRight,
   CalendarDays,
@@ -18,6 +18,7 @@ import {
   X,
   Plus,
 } from "lucide-react";
+import { searchFlights } from "../../services/flightsApi";
 
 /* =========================================================
    MOCK DATA (luego lo reemplazas por tu backend)
@@ -202,15 +203,15 @@ export default function FlightsPage() {
   const [tripType, setTripType] = useState("roundtrip"); // oneway | roundtrip | multidest
 
   // Single route state (oneway/roundtrip)
-  const [from, setFrom] = useState(AIRPORTS.find((a) => a.code === "BOG"));
-  const [to, setTo] = useState(AIRPORTS.find((a) => a.code === "MAD"));
+  const [from, setFrom] = useState(null);
+  const [to, setTo] = useState(null);
   const [departDate, setDepartDate] = useState(toISODate(addDays(new Date(), 21)));
   const [returnDate, setReturnDate] = useState(toISODate(addDays(new Date(), 28)));
 
   // Multidest state (list of legs)
   const [legs, setLegs] = useState([
-    { from: AIRPORTS.find((a) => a.code === "BOG"), to: AIRPORTS.find((a) => a.code === "MAD"), date: toISODate(addDays(new Date(), 21)) },
-    { from: AIRPORTS.find((a) => a.code === "MAD"), to: AIRPORTS.find((a) => a.code === "CDG"), date: toISODate(addDays(new Date(), 25)) },
+    { from: null, to: null, date: toISODate(addDays(new Date(), 21)) },
+    { from: null, to: null, date: toISODate(addDays(new Date(), 25)) },
   ]);
 
   // Shared state
@@ -230,8 +231,8 @@ export default function FlightsPage() {
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
 
   // Filters
-  const [priceMax, setPriceMax] = useState(1200);
-  const [durationMax, setDurationMax] = useState(16); // horas
+  const [priceMax, setPriceMax] = useState(5000000); // Aumentado para vuelos internacionales
+  const [durationMax, setDurationMax] = useState(24); // horas
   const [stopsFilter, setStopsFilter] = useState("any"); // any | nonstop | onestop | twoplus
   const [selectedAirlines, setSelectedAirlines] = useState(new Set());
   const [timeBand, setTimeBand] = useState("any"); // any | morning | afternoon | night
@@ -239,23 +240,43 @@ export default function FlightsPage() {
   // Money saving feature
   const [priceAlert, setPriceAlert] = useState(false);
 
+  // Real flights from database
+  const [realFlights, setRealFlights] = useState([]);
+  const [loadingFlights, setLoadingFlights] = useState(false);
+  const [availableAirports, setAvailableAirports] = useState([]);
+
+  // Get unique airlines from real flights
+  const availableAirlines = useMemo(() => {
+    const airlines = new Set();
+    realFlights.forEach(flight => {
+      if (flight.aerolinea) {
+        airlines.add(flight.aerolinea);
+      }
+    });
+    return Array.from(airlines).map(name => ({ id: name.toLowerCase(), name }));
+  }, [realFlights]);
+
   const paxTotal = passengers.adults + passengers.children + passengers.infants;
 
   const fromSuggestions = useMemo(() => {
     const q = fromQuery.trim().toLowerCase();
-    if (!q) return AIRPORTS.slice(0, 7);
-    return AIRPORTS
+    const airportsToUse = availableAirports.length > 0 ? availableAirports : AIRPORTS;
+    
+    if (!q) return airportsToUse.slice(0, 7);
+    return airportsToUse
       .filter((a) => `${a.code} ${a.city} ${a.name} ${a.country}`.toLowerCase().includes(q))
       .slice(0, 7);
-  }, [fromQuery]);
+  }, [fromQuery, availableAirports]);
 
   const toSuggestions = useMemo(() => {
     const q = toQuery.trim().toLowerCase();
-    if (!q) return AIRPORTS.slice(0, 7);
-    return AIRPORTS
+    const airportsToUse = availableAirports.length > 0 ? availableAirports : AIRPORTS;
+    
+    if (!q) return airportsToUse.slice(0, 7);
+    return airportsToUse
       .filter((a) => `${a.code} ${a.city} ${a.name} ${a.country}`.toLowerCase().includes(q))
       .slice(0, 7);
-  }, [toQuery]);
+  }, [toQuery, availableAirports]);
 
   // Which route is used to generate mock results?
   // In Multidest we use the first leg as "reference" until backend exists.
@@ -263,6 +284,83 @@ export default function FlightsPage() {
   const activeTo = tripType === "multidest" ? legs?.[0]?.to : to;
   const activeDepartDate = tripType === "multidest" ? legs?.[0]?.date : departDate;
   const activeReturnDate = tripType === "roundtrip" ? returnDate : null;
+
+  // Load real flights from database
+  useEffect(() => {
+    async function loadFlights() {
+      setLoadingFlights(true);
+      try {
+        let flights;
+        if (!activeFrom?.code && !activeTo?.code) {
+          // Si no hay origen ni destino, traer todos los vuelos
+          const response = await fetch('http://localhost:3002/api/flights');
+          const data = await response.json();
+          flights = data.flights;
+        } else if (activeFrom?.code && activeTo?.code) {
+          // Si hay origen y destino, buscar específicamente
+          flights = await searchFlights(activeFrom.code, activeTo.code);
+        } else {
+          // Si solo hay uno de los dos, no buscar nada
+          flights = [];
+        }
+        setRealFlights(flights || []);
+      } catch (error) {
+        console.error("Error cargando vuelos:", error);
+        setRealFlights([]);
+      } finally {
+        setLoadingFlights(false);
+      }
+    }
+
+    loadFlights();
+  }, [activeFrom?.code, activeTo?.code]);
+
+  // Load all flights to get available airports
+  useEffect(() => {
+    async function loadAirports() {
+      try {
+        const response = await fetch('http://localhost:3002/api/flights');
+        const data = await response.json();
+        
+        // Extract unique airports from flights
+        const airportsMap = new Map();
+        
+        data.flights.forEach(flight => {
+          // Add origin airport
+          if (flight.aeropuerto_origen && flight.ciudad_origen) {
+            const key = flight.aeropuerto_origen;
+            if (!airportsMap.has(key)) {
+              airportsMap.set(key, {
+                code: flight.aeropuerto_origen,
+                city: flight.ciudad_origen,
+                name: flight.aeropuerto_origen,
+                country: flight.pais_origen || ''
+              });
+            }
+          }
+          
+          // Add destination airport
+          if (flight.aeropuerto_destino && flight.ciudad_destino) {
+            const key = flight.aeropuerto_destino;
+            if (!airportsMap.has(key)) {
+              airportsMap.set(key, {
+                code: flight.aeropuerto_destino,
+                city: flight.ciudad_destino,
+                name: flight.aeropuerto_destino,
+                country: flight.pais_destino || ''
+              });
+            }
+          }
+        });
+        
+        setAvailableAirports(Array.from(airportsMap.values()));
+      } catch (error) {
+        console.error("Error cargando aeropuertos:", error);
+      }
+    }
+
+    loadAirports();
+  }, []);
 
   const calendar = useMemo(
     () =>
@@ -279,7 +377,65 @@ export default function FlightsPage() {
 
   const nonStopOnly = stopsFilter === "nonstop";
 
+  // Convert real flights from DB to the format expected by the UI
   const resultsRaw = useMemo(() => {
+    if (realFlights.length > 0) {
+      // Use real flights from database (tabla vuelos)
+      const flights = realFlights.map((flight) => ({
+        id: `flight-${flight.id}`,
+        airline: flight.aerolinea || "Aerolínea",
+        from: flight.aeropuerto_origen || activeFrom?.code,
+        to: flight.aeropuerto_destino || activeTo?.code,
+        depart: flight.hora_salida || "00:00",
+        arrive: flight.hora_llegada || "00:00",
+        durationMin: flight.duracion_minutos || 0,
+        stops: flight.numero_escalas || 0,
+        benefits: flight.beneficios ? (Array.isArray(flight.beneficios) ? flight.beneficios : [flight.beneficios]) : [],
+        fareTiers: {
+          basic: flight.precio_basico || 0,
+          standard: flight.precio_estandar || 0,
+          flexible: flight.precio_flexible || 0,
+          premium: flight.precio_premium || 0,
+        },
+        total: flight.precio_estandar || 0,
+        tags: [],
+      }));
+
+      // Agregar tags según los criterios
+      if (flights.length > 0) {
+        // Encontrar el más barato
+        const cheapest = flights.reduce((min, flight) => 
+          flight.total < min.total ? flight : min
+        );
+        
+        // Encontrar el más rápido
+        const fastest = flights.reduce((min, flight) => 
+          flight.durationMin < min.durationMin ? flight : min
+        );
+        
+        // Agregar tags
+        flights.forEach(flight => {
+          if (flight.id === cheapest.id) {
+            flight.tags.push({ kind: "cheap", text: "Más barato" });
+          }
+          if (flight.id === fastest.id) {
+            flight.tags.push({ kind: "fast", text: "Más rápido" });
+          }
+          if (flight.stops === 0) {
+            flight.tags.push({ kind: "direct", text: "Directo" });
+          }
+        });
+        
+        // El primer vuelo (ordenado por precio) es "Mejor opción"
+        if (flights[0]) {
+          flights[0].tags.unshift({ kind: "best", text: "Mejor opción" });
+        }
+      }
+
+      return flights;
+    }
+
+    // Fallback to mock data if no real flights
     return mockFlightResults({
       from: activeFrom,
       to: activeTo,
@@ -289,25 +445,34 @@ export default function FlightsPage() {
       cabin,
       nonStopOnly,
     });
-  }, [activeFrom, activeTo, activeDepartDate, activeReturnDate, paxTotal, cabin, nonStopOnly]);
+  }, [realFlights, activeFrom, activeTo, activeDepartDate, activeReturnDate, paxTotal, cabin, nonStopOnly]);
 
   const resultsFiltered = useMemo(() => {
     return resultsRaw.filter((r) => {
-      if (r.total > priceMax) return false;
+      // Filtro de precio (convertir a miles para comparar correctamente)
+      const priceToCompare = r.total;
+      if (priceToCompare > priceMax * 1000) return false;
 
+      // Filtro de duración
       const durH = r.durationMin / 60;
       if (durH > durationMax) return false;
 
+      // Filtro de escalas
       if (stopsFilter === "nonstop" && r.stops !== 0) return false;
       if (stopsFilter === "onestop" && r.stops !== 1) return false;
       if (stopsFilter === "twoplus" && r.stops < 2) return false;
 
+      // Filtro de aerolíneas
       if (selectedAirlines.size > 0 && !selectedAirlines.has(r.airline)) return false;
 
+      // Filtro de horario
       if (timeBand !== "any") {
-        const hour = Number(r.depart.split(":")[0]);
-        const band = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "night";
-        if (band !== timeBand) return false;
+        const timeParts = r.depart.split(":");
+        if (timeParts.length > 0) {
+          const hour = Number(timeParts[0]);
+          const band = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "night";
+          if (band !== timeBand) return false;
+        }
       }
 
       return true;
@@ -734,6 +899,7 @@ export default function FlightsPage() {
             setAirlineToggle={setAirlineToggle}
             timeBand={timeBand}
             setTimeBand={setTimeBand}
+            availableAirlines={availableAirlines}
           />
         </aside>
 
@@ -742,10 +908,17 @@ export default function FlightsPage() {
           {/* Top bar results */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="text-sm text-slate-600">
-              <span className="font-semibold text-slate-900">{resultsFiltered.length}</span> opciones · {travelSummary.paxTotal} pasajero(s) ·{" "}
-              {travelSummary.cabin}
-              {tripType === "roundtrip" && <span> · {travelSummary.nights} días</span>}
-              {tripType === "multidest" && <span> · {legs.length} tramo(s)</span>}
+              {loadingFlights ? (
+                <span className="font-semibold text-sky-600">Cargando vuelos...</span>
+              ) : (
+                <>
+                  <span className="font-semibold text-slate-900">{resultsFiltered.length}</span> opciones · {travelSummary.paxTotal} pasajero(s) ·{" "}
+                  {travelSummary.cabin}
+                  {tripType === "roundtrip" && <span> · {travelSummary.nights} días</span>}
+                  {tripType === "multidest" && <span> · {legs.length} tramo(s)</span>}
+                  {realFlights.length > 0 && <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Base de datos</span>}
+                </>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -768,15 +941,29 @@ export default function FlightsPage() {
 
           {/* Results list */}
           <div className="mt-4 space-y-3">
-            {resultsFiltered.map((r, idx) => (
-              <FlightCard key={r.id} flight={r} highlight={idx === 0} />
-            ))}
-
-            {!resultsFiltered.length && (
-              <div className="p-6 rounded-2xl border border-slate-200 bg-white text-slate-700">
-                <div className="font-semibold">No hay resultados con estos filtros.</div>
-                <div className="text-sm text-slate-600 mt-1">Prueba aumentando el presupuesto o cambiando escalas.</div>
+            {loadingFlights ? (
+              <div className="p-8 rounded-2xl border border-slate-200 bg-white text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600 mb-3"></div>
+                <div className="font-semibold text-slate-900">Buscando vuelos...</div>
+                <div className="text-sm text-slate-600 mt-1">Consultando opciones disponibles en la base de datos</div>
               </div>
+            ) : (
+              <>
+                {resultsFiltered.map((r, idx) => (
+                  <FlightCard key={r.id} flight={r} highlight={idx === 0} />
+                ))}
+
+                {!resultsFiltered.length && (
+                  <div className="p-6 rounded-2xl border border-slate-200 bg-white text-slate-700">
+                    <div className="font-semibold">No hay resultados con estos filtros.</div>
+                    <div className="text-sm text-slate-600 mt-1">
+                      {realFlights.length === 0 
+                        ? "No hay vuelos disponibles para esta ruta en la base de datos." 
+                        : "Prueba aumentando el presupuesto o cambiando escalas."}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -830,6 +1017,7 @@ export default function FlightsPage() {
             setAirlineToggle={setAirlineToggle}
             timeBand={timeBand}
             setTimeBand={setTimeBand}
+            availableAirlines={availableAirlines}
           />
         </Modal>
       )}
@@ -1261,6 +1449,7 @@ function FilterPanel({
   setAirlineToggle,
   timeBand,
   setTimeBand,
+  availableAirlines = [],
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
@@ -1277,19 +1466,19 @@ function FilterPanel({
         <div>
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-slate-900">Precio máximo</div>
-            <div className="text-sm text-slate-700">{money(priceMax)}</div>
+            <div className="text-sm text-slate-700">${priceMax}k</div>
           </div>
           <input
             type="range"
-            min={150}
-            max={2000}
-            step={10}
+            min={100}
+            max={5000}
+            step={50}
             value={priceMax}
             onChange={(e) => setPriceMax(Number(e.target.value))}
             className="w-full mt-2"
           />
           <div className="text-xs text-slate-500 mt-1">
-            Tip: subir un poco el presupuesto puede desbloquear mejores horarios.
+            Precio en miles de pesos (COP). Ajusta según tu presupuesto.
           </div>
         </div>
 
@@ -1353,22 +1542,41 @@ function FilterPanel({
         <div>
           <div className="text-sm font-semibold text-slate-900">Aerolíneas</div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {AIRLINES.map((a) => {
-              const active = selectedAirlines.has(a.name);
-              return (
-                <button
-                  key={a.id}
-                  onClick={() => setAirlineToggle(a.name)}
-                  className={`px-3 py-2 rounded-xl border text-sm font-semibold transition ${
-                    active
-                      ? "bg-sky-600 text-white border-sky-600"
-                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  {a.name}
-                </button>
-              );
-            })}
+            {availableAirlines.length > 0 ? (
+              availableAirlines.map((a) => {
+                const active = selectedAirlines.has(a.name);
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setAirlineToggle(a.name)}
+                    className={`px-3 py-2 rounded-xl border text-sm font-semibold transition ${
+                      active
+                        ? "bg-sky-600 text-white border-sky-600"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {a.name}
+                  </button>
+                );
+              })
+            ) : (
+              AIRLINES.map((a) => {
+                const active = selectedAirlines.has(a.name);
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setAirlineToggle(a.name)}
+                    className={`px-3 py-2 rounded-xl border text-sm font-semibold transition ${
+                      active
+                        ? "bg-sky-600 text-white border-sky-600"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {a.name}
+                  </button>
+                );
+              })
+            )}
           </div>
           <div className="text-xs text-slate-500 mt-2">Si no eliges ninguna, se muestran todas.</div>
         </div>
