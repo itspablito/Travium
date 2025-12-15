@@ -9,7 +9,7 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-gradient-to-r from-[#ffecd2] via-[#fcb69f] to-[#ff7e5f] shadow-md backdrop-blur-sm border-b border-slate-200/50">
+    <header className="sticky top-0 z-50 bg-white shadow-md backdrop-blur-sm border-b border-slate-200/50">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-6">
 
         {/* Logo */}
