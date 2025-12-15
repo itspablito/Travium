@@ -213,7 +213,7 @@ export default function VehiclesPage() {
 
                   try {
                     console.log("🔎 Enviando reserva:", reserva);
-                    const res = await fetch("http://localhost:3006/api/reservas", {
+                    const res = await fetch("http://localhost:3007/api/reservas", {
                       method: "POST",
                       headers: {
                         "Content-Type": "application/json",
